@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package rpclib;
+
+import "scalapb/scalapb.proto";
+
+option java_multiple_files = true;
+option java_package = "com.tubitv.rpc";
+option objc_class_prefix = "TAPI";
+
+option (scalapb.options).flat_package = true;
+
+service TestService {
+  rpc Unary           (       Request) returns (       Response);
+  rpc ServerStreaming (       Request) returns (stream Response);
+  rpc ClientStreaming (stream Request) returns (       Response);
+  rpc BidiStreaming   (stream Request) returns (stream Response);
+}
+
+message Request {
+  int32 value = 1;
+}
+
+message Response {
+  int32 value = 1;
+}
