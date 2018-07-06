@@ -53,8 +53,9 @@ To start using RPCLib in your project:
 
 If your project isn't already using ScalaPB, you'll also need to add two
 files, `scalapb/scalapb.proto` and `google/protobuf/descriptor.proto`,
-to your Protocol Buffer directory.  See the example project in the
-`/examples/minimal/` directory for these files.
+to your Protocol Buffer directory.  See the example projects in the
+`/examples/minimal-server/` and `/examples/minimal-client/` directories
+for these files.
 
 ##  Quick start for RPCLib developers
 
