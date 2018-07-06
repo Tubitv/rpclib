@@ -93,3 +93,12 @@ To run the library tests, execute the following in the `/rpclib-test/`
 directory:
 
     $ sbt test
+
+##  Acknowledgements
+
+The core of this library is based heavily on the [gRPC Akka Stream
+library][1].
+
+
+
+[1]:  https://github.com/btlines/grpcakkastream
