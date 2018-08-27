@@ -52,10 +52,12 @@ object GrpcAkkaStreams {
     ): (GraphStageLogic, Future[StreamObserver[O]]) = {
       val promise: Promise[StreamObserver[O]] = Promise()
       val logic = new GraphStageLogic(shape) {
+        val completeCallback = getAsyncCallback((_: Unit) => complete(out))
+        val nextCallback = getAsyncCallback((value: O) => emit(out, value))
         val observer = new StreamObserver[O] {
           override def onError(t: Throwable) = fail(out, t)
-          override def onCompleted() = getAsyncCallback((_: Unit) => complete(out)).invoke(())
-          override def onNext(value: O) = getAsyncCallback((value: O) => emit(out, value)).invoke(value)
+          override def onCompleted() = completeCallback.invoke(())
+          override def onNext(value: O) = nextCallback.invoke(value)
         }
         setHandler(out, new OutHandler {
           override def onPull(): Unit = ()
