@@ -8,4 +8,5 @@ object Libraries {
   val grpcStub        = "io.grpc"               % "grpc-stub"        % grpcJavaVersion
   val reactiveStreams = "org.reactivestreams"   % "reactive-streams" % "1.0.2"
   val scalapbCompiler = "com.thesamet.scalapb" %% "compilerplugin"   % scalapbVersion
+  val scalapbGrpcRuntime = "com.thesamet.scalapb"   %% "scalapb-runtime-grpc" % scalapbVersion
 }

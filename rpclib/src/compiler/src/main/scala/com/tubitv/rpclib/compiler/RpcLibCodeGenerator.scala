@@ -190,6 +190,7 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
         "com.tubitv.rpclib.runtime.FailurePolicy.Fallthrough",
         "com.tubitv.rpclib.runtime.FailurePolicy.RetryPolicy",
         "com.tubitv.rpclib.runtime.GrpcAkkaStreams._",
+        "com.tubitv.rpclib.runtime.{GrpcAkkaStreamsClientCalls, GrpcAkkaStreamsServerCalls}",
         "com.tubitv.rpclib.runtime.headers.EnvoyHeaders",
         "com.tubitv.rpclib.runtime.interceptors.EnvoyHeadersClientInterceptor",
         "com.tubitv.rpclib.runtime.interceptors.EnvoyHeadersServerInterceptor",
