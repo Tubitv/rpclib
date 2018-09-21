@@ -57,7 +57,8 @@ object Projects {
         libraryDependencies ++= Seq(
           Libraries.akkaStreams,
           Libraries.grpcStub,
-          Libraries.reactiveStreams
+          Libraries.reactiveStreams,
+          Libraries.scalapbGrpcRuntime
         )
       )
 }

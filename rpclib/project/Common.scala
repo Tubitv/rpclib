@@ -2,7 +2,7 @@ import sbt.Keys._
 
 object Common {
 
-  private final val RpclibVersion = "0.3.0"
+  private final val RpclibVersion = "1.0.0"
 
   lazy val settings =
     Seq(

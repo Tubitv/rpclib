@@ -2,7 +2,6 @@ package com.tubitv.rpclib.compiler
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
-
 import com.google.protobuf.Descriptors.Descriptor
 import com.google.protobuf.Descriptors.FileDescriptor
 import com.google.protobuf.Descriptors.MethodDescriptor
@@ -19,7 +18,8 @@ import scalapb.compiler.GeneratorParams
 import scalapb.compiler.NameUtils
 import scalapb.compiler.ProtoValidation
 import scalapb.compiler.StreamType
-import scalapb.compiler.Version.{ scalapbVersion => ScalaPbVersion }
+import scalapb.compiler.StreamType.{Bidirectional, ClientStreaming, ServerStreaming, Unary}
+import scalapb.compiler.Version.{scalapbVersion => ScalaPbVersion}
 import scalapb.options.compiler.Scalapb
 
 object RpcLibCodeGenerator extends ProtocCodeGenerator {
@@ -190,6 +190,7 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
         "com.tubitv.rpclib.runtime.FailurePolicy.Fallthrough",
         "com.tubitv.rpclib.runtime.FailurePolicy.RetryPolicy",
         "com.tubitv.rpclib.runtime.GrpcAkkaStreams._",
+        "com.tubitv.rpclib.runtime.{GrpcAkkaStreamsClientCalls, GrpcAkkaStreamsServerCalls}",
         "com.tubitv.rpclib.runtime.headers.EnvoyHeaders",
         "com.tubitv.rpclib.runtime.interceptors.EnvoyHeadersClientInterceptor",
         "com.tubitv.rpclib.runtime.interceptors.EnvoyHeadersServerInterceptor",
@@ -337,71 +338,22 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
         private def addStubMethodImplementations(printer: FunctionalPrinter, method: MethodDescriptor): FunctionalPrinter = {
           def addBody(printer: FunctionalPrinter): FunctionalPrinter = {
             method.streamType match {
-              case StreamType.Unary =>
-                printer
-                  .add(s"Flow[${method.scalaIn}].flatMapConcat(request =>")
-                  .indent
-                  .add("Source.fromFuture(")
-                  .indent
-                  .add("Grpc.guavaFuture2ScalaFuture(")
-                  .indent
-                  .add("ClientCalls.futureUnaryCall(")
-                  .indent
-                  .add(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders)),")
-                  .add("request")
-                  .outdent
-                  .add(")")
-                  .outdent
-                  .add(")")
-                  .outdent
-                  .add(")")
-                  .outdent
-                  .add(")")
-
-              case StreamType.ServerStreaming =>
-                printer
-                  .add("Flow.fromGraph(")
-                  .indent
-                  .add(s"new GrpcGraphStage[${method.scalaIn}, ${method.scalaOut}]({ outputObserver =>")
-                  .indent
-                  .add(s"new StreamObserver[${method.scalaIn}] {")
-                  .indent
-                  .add("override def onError(t: Throwable): Unit = ()")
-                  .add("override def onCompleted(): Unit = ()")
-                  .add(s"override def onNext(request: ${method.scalaIn}): Unit = {")
-                  .indent
-                  .add("ClientCalls.asyncServerStreamingCall(")
-                  .indent
-                  .add(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders)),")
-                  .add("request,")
-                  .add("outputObserver")
-                  .outdent
-                  .add(")")
-                  .outdent
-                  .add("}")
-                  .outdent
-                  .add("}")
-                  .outdent
-                  .add("})")
-                  .outdent
-                  .add(")")
-
-              case StreamType.ClientStreaming | StreamType.Bidirectional =>
-                printer
-                  .add("Flow.fromGraph(")
-                  .indent
-                  .add(s"new GrpcGraphStage[${method.scalaIn}, ${method.scalaOut}]({ outputObserver =>")
-                  .indent
-                  .add("ClientCalls.asyncClientStreamingCall(")
-                  .indent
-                  .add(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders)),")
-                  .add("outputObserver")
-                  .outdent
-                  .add(")")
-                  .outdent
-                  .add("})")
-                  .outdent
-                  .add(")")
+              case Unary => printer
+                .add(s"GrpcAkkaStreamsClientCalls.unaryFlow[${method.scalaIn}, ${method.scalaOut}](")
+                .addIndented(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
+                .add(")")
+              case ServerStreaming => printer
+                .add(s"GrpcAkkaStreamsClientCalls.serverStreamingFlow[${method.scalaIn}, ${method.scalaOut}](")
+                .addIndented(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
+                .add(")")
+              case ClientStreaming => printer
+                .add(s"GrpcAkkaStreamsClientCalls.clientStreamingFlow[${method.scalaIn}, ${method.scalaOut}](")
+                .addIndented(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
+                .add(")")
+              case Bidirectional => printer
+                .add(s"GrpcAkkaStreamsClientCalls.bidiStreamingFlow[${method.scalaIn}, ${method.scalaOut}](")
+                .addIndented(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
+                .add(")")
             }
           }
 
@@ -494,68 +446,23 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
     private def addBindServiceMethod(printer: FunctionalPrinter): FunctionalPrinter = {
       def addMethodCall(printer: FunctionalPrinter, method: MethodDescriptor): FunctionalPrinter = {
         def addBody(printer: FunctionalPrinter): FunctionalPrinter = {
-          val methodType = method.streamType match {
-            case StreamType.Unary => "Unary"
-            case StreamType.ServerStreaming => "ServerStreaming"
-            case StreamType.ClientStreaming => "ClientStreaming"
-            case StreamType.Bidirectional => "BidiStreaming"
-          }
-
           method.streamType match {
-            case StreamType.Unary | StreamType.ServerStreaming =>
+            case StreamType.Unary =>
               printer
                 .add(s"Method${method.getName},")
-                .add(s"ServerCalls.async${methodType}Call(")
-                .indent
-                .add(s"new ServerCalls.${methodType}Method[${method.scalaIn}, ${method.scalaOut}] {")
-                .indent
-                .add(s"override def invoke(request: ${method.scalaIn}, responseObserver: StreamObserver[${method.scalaOut}]) = {")
-                .indent
-                .add("Source.single(request)")
-                .indent
-                .add(s".via(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
-                .add(".runForeach(responseObserver.onNext)")
-                .add(".onComplete {")
-                .indent
-                .add("case Success(_) => responseObserver.onCompleted()")
-                .add("case Failure(t) => responseObserver.onError(io.grpc.Status.fromThrowable(t).asException)")
-                .outdent
-                .add("}(mat.executionContext)")
-                .outdent
-                .outdent
-                .add("}")
-                .outdent
-                .add("}")
-                .outdent
-                .add(")")
-
-            case StreamType.ClientStreaming | StreamType.Bidirectional =>
+                .add(s"GrpcAkkaStreamsServerCalls.unaryCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+            case StreamType.ClientStreaming =>
               printer
                 .add(s"Method${method.getName},")
-                .add(s"ServerCalls.async${methodType}Call(")
-                .indent
-                .add(s"new ServerCalls.${methodType}Method[${method.scalaIn}, ${method.scalaOut}] {")
-                .indent
-                .add(s"override def invoke(responseObserver: StreamObserver[${method.scalaOut}]): StreamObserver[${method.scalaIn}] = {")
-                .indent
-                .add("// blocks until the `GraphStage` is fully initialized")
-                .add("Await.result(")
-                .indent
-                .add(s"Source.fromGraph(new GrpcSourceStage[${method.scalaIn}])")
-                .indent
-                .add(s".via(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
-                .add(".to(Sink.fromSubscriber(grpcObserverToReactiveSubscriber(responseObserver)))")
-                .add(".run(),")
-                .outdent
-                .add("5.seconds")
-                .outdent
-                .add(")")
-                .outdent
-                .add("}")
-                .outdent
-                .add("}")
-                .outdent
-                .add(")")
+                .add(s"GrpcAkkaStreamsServerCalls.clientStreamingCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+            case StreamType.ServerStreaming =>
+              printer
+                .add(s"Method${method.getName},")
+                .add(s"GrpcAkkaStreamsServerCalls.serverStreamingCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+            case StreamType.Bidirectional =>
+              printer
+              .add(s"Method${method.getName},")
+              .add(s"GrpcAkkaStreamsServerCalls.bidiStreamingCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
           }
         }
 
