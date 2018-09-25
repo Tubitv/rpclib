@@ -4,7 +4,6 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
-import com.tubitv.rpclib.runtime.GrpcAkkaStreams.GrpcOperator
 import io.grpc.stub.{ClientCallStreamObserver, ClientResponseObserver}
 
 class GrpcGraphStage[Req, Resp](operator: GrpcOperator[Req, Resp]) extends GraphStage[FlowShape[Req, Resp]] {
