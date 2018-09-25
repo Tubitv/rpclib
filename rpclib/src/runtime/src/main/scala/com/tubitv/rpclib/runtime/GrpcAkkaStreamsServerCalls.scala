@@ -2,7 +2,9 @@ package com.tubitv.rpclib.runtime
 
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import io.grpc.ServerCallHandler
+import com.tubitv.rpclib.runtime.headers.EnvoyHeaders
+import com.tubitv.rpclib.runtime.interceptors.EnvoyHeadersServerInterceptor
+import io.grpc.{Context, ServerCallHandler}
 import io.grpc.stub.{CallStreamObserver, ServerCalls, StreamObserver}
 
 import scala.concurrent.Await
@@ -11,7 +13,7 @@ import scala.util.{Failure, Success}
 
 object GrpcAkkaStreamsServerCalls {
 
-  def unaryCall[Req, Resp, NotUsed](service: Flow[Req, Resp, NotUsed])(
+  def unaryCall[Req, Resp, NotUsed](getService: EnvoyHeaders => Flow[Req, Resp, NotUsed])(
     implicit mat: Materializer
   ): ServerCallHandler[Req, Resp] =
     ServerCalls.asyncUnaryCall(
@@ -19,7 +21,7 @@ object GrpcAkkaStreamsServerCalls {
         override def invoke(request: Req, responseObserver: StreamObserver[Resp]) =
           Source
             .single(request)
-            .via(service)
+            .via(getService(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))
             .runForeach(responseObserver.onNext)
             .onComplete {
               case Success(_) => responseObserver.onCompleted()
@@ -28,7 +30,7 @@ object GrpcAkkaStreamsServerCalls {
       }
     )
 
-  def serverStreamingCall[Req, Resp, NotUsed](service: Flow[Req, Resp, NotUsed])(
+  def serverStreamingCall[Req, Resp, NotUsed](getService: EnvoyHeaders => Flow[Req, Resp, NotUsed])(
     implicit mat: Materializer
   ): ServerCallHandler[Req, Resp] =
     ServerCalls.asyncServerStreamingCall(
@@ -36,14 +38,14 @@ object GrpcAkkaStreamsServerCalls {
         override def invoke(request: Req, responseObserver: StreamObserver[Resp]): Unit =
           Source
             .single(request)
-            .via(service)
+            .via(getService(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))
             .runWith(Sink.fromGraph(new GrpcSinkStage[Resp](
               responseObserver.asInstanceOf[CallStreamObserver[Resp]]
             )))
       }
     )
 
-  def clientStreamingCall[Req, Resp, NotUsed](service: Flow[Req, Resp, NotUsed])(
+  def clientStreamingCall[Req, Resp, NotUsed](getService: EnvoyHeaders => Flow[Req, Resp, NotUsed])(
     implicit mat: Materializer
   ): ServerCallHandler[Req, Resp] =
     ServerCalls.asyncClientStreamingCall(
@@ -55,7 +57,7 @@ object GrpcAkkaStreamsServerCalls {
               .fromGraph(new GrpcSourceStage[Req, Resp](
                 responseObserver.asInstanceOf[CallStreamObserver[Resp]]
               ))
-              .via(service)
+              .via(getService(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))
               .to(Sink.fromGraph(new GrpcSinkStage[Resp](
                 responseObserver.asInstanceOf[CallStreamObserver[Resp]]
               ))).run(),
@@ -64,7 +66,7 @@ object GrpcAkkaStreamsServerCalls {
       }
     )
 
-  def bidiStreamingCall[Req, Resp, NotUsed](service: Flow[Req, Resp, NotUsed])(
+  def bidiStreamingCall[Req, Resp, NotUsed](getService: EnvoyHeaders => Flow[Req, Resp, NotUsed])(
     implicit mat: Materializer
   ): ServerCallHandler[Req, Resp] =
     ServerCalls.asyncBidiStreamingCall(
@@ -76,7 +78,7 @@ object GrpcAkkaStreamsServerCalls {
               .fromGraph(new GrpcSourceStage[Req, Resp](
                 responseObserver.asInstanceOf[CallStreamObserver[Resp]]
               ))
-              .via(service)
+              .via(getService(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))
               .to(Sink.fromGraph(new GrpcSinkStage[Resp](
                 responseObserver.asInstanceOf[CallStreamObserver[Resp]]
               ))).run(),

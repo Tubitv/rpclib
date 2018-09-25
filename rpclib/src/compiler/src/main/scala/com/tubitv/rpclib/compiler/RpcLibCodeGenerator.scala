@@ -450,19 +450,19 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
             case StreamType.Unary =>
               printer
                 .add(s"Method${method.getName},")
-                .add(s"GrpcAkkaStreamsServerCalls.unaryCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+                .add(s"GrpcAkkaStreamsServerCalls.unaryCall(serviceImpl.${method.name}(_))")
             case StreamType.ClientStreaming =>
               printer
                 .add(s"Method${method.getName},")
-                .add(s"GrpcAkkaStreamsServerCalls.clientStreamingCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+                .add(s"GrpcAkkaStreamsServerCalls.clientStreamingCall(serviceImpl.${method.name}(_))")
             case StreamType.ServerStreaming =>
               printer
                 .add(s"Method${method.getName},")
-                .add(s"GrpcAkkaStreamsServerCalls.serverStreamingCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+                .add(s"GrpcAkkaStreamsServerCalls.serverStreamingCall(serviceImpl.${method.name}(_))")
             case StreamType.Bidirectional =>
               printer
               .add(s"Method${method.getName},")
-              .add(s"GrpcAkkaStreamsServerCalls.bidiStreamingCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+              .add(s"GrpcAkkaStreamsServerCalls.bidiStreamingCall(serviceImpl.${method.name}(_))")
           }
         }
 
