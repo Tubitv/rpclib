@@ -10,21 +10,22 @@ import scalapb.grpc.Grpc
 
 object GrpcAkkaStreamsClientCalls {
 
-  def unaryFlow[Req, Resp](call: ClientCall[Req, Resp]): Flow[Req, Resp, NotUsed] = {
+  def unaryFlow[Req, Resp](getCall: () => ClientCall[Req, Resp]): Flow[Req, Resp, NotUsed] = {
     Flow[Req].flatMapConcat(req => {
       Source.fromFuture(
         Grpc.guavaFuture2ScalaFuture(
-          ClientCalls.futureUnaryCall(call, req)
+          ClientCalls.futureUnaryCall(getCall(), req)
         )
       )
     })
   }
 
-  def serverStreamingFlow[Req, Resp](call: ClientCall[Req, Resp]): Flow[Req, Resp, NotUsed] =
+  def serverStreamingFlow[Req, Resp](getCall: () => ClientCall[Req, Resp]): Flow[Req, Resp, NotUsed] =
     Flow.fromGraph(
       new GrpcGraphStage[Req, Resp](outputObserver => {
         val out = outputObserver.asInstanceOf[ClientResponseObserver[Req, Resp]]
         val in = new ClientCallStreamObserver[Req] {
+          val call = getCall()
           val halfClosed = new AtomicBoolean(false)
           val onReadyHandler = new AtomicReference[Option[Runnable]](None)
           val listener = new ClientCall.Listener[Resp] {
@@ -63,9 +64,9 @@ object GrpcAkkaStreamsClientCalls {
       })
     )
 
-  def clientStreamingFlow[Req, Resp](call: ClientCall[Req, Resp]): Flow[Req, Resp, NotUsed] =
-    Flow.fromGraph(new GrpcGraphStage[Req, Resp](ClientCalls.asyncClientStreamingCall(call, _)))
+  def clientStreamingFlow[Req, Resp](getCall: () => ClientCall[Req, Resp]): Flow[Req, Resp, NotUsed] =
+    Flow.fromGraph(new GrpcGraphStage[Req, Resp](ClientCalls.asyncClientStreamingCall(getCall(), _)))
 
-  def bidiStreamingFlow[Req, Resp](call: ClientCall[Req, Resp]): Flow[Req, Resp, NotUsed] =
-    Flow.fromGraph(new GrpcGraphStage[Req, Resp](ClientCalls.asyncBidiStreamingCall(call, _)))
+  def bidiStreamingFlow[Req, Resp](getCall: () => ClientCall[Req, Resp]): Flow[Req, Resp, NotUsed] =
+    Flow.fromGraph(new GrpcGraphStage[Req, Resp](ClientCalls.asyncBidiStreamingCall(getCall(), _)))
 }
