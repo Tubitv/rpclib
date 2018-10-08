@@ -60,7 +60,14 @@ class GrpcGraphStage[Req, Resp](operator: GrpcOperator[Req, Resp]) extends Graph
         }
       }
 
-      override def onUpstreamFinish(): Unit = inObs.onCompleted()
+      override def onUpstreamFinish(): Unit = {
+        requestStream.get().foreach { reqStream =>
+          element.getAndSet(None).foreach { value =>
+            reqStream.onNext(value)
+          }
+        }
+        inObs.onCompleted()
+      }
 
       override def onUpstreamFailure(t: Throwable): Unit = inObs.onError(t)
 
