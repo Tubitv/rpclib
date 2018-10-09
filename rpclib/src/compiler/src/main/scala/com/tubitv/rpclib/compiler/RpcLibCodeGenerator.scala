@@ -11,16 +11,16 @@ import com.google.protobuf.compiler.PluginProtos.CodeGeneratorRequest
 import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse
 import protocbridge.Artifact
 import protocbridge.ProtocCodeGenerator
-import scalapb.compiler.DescriptorPimps
-import scalapb.compiler.FunctionalPrinter
-import scalapb.compiler.GeneratorException
-import scalapb.compiler.GeneratorParams
-import scalapb.compiler.NameUtils
-import scalapb.compiler.ProtoValidation
-import scalapb.compiler.StreamType
-import scalapb.compiler.StreamType.{Bidirectional, ClientStreaming, ServerStreaming, Unary}
-import scalapb.compiler.Version.{scalapbVersion => ScalaPbVersion}
-import scalapb.options.compiler.Scalapb
+import com.trueaccord.scalapb.compiler.DescriptorPimps
+import com.trueaccord.scalapb.compiler.FunctionalPrinter
+import com.trueaccord.scalapb.compiler.GeneratorException
+import com.trueaccord.scalapb.compiler.GeneratorParams
+import com.trueaccord.scalapb.compiler.NameUtils
+import com.trueaccord.scalapb.compiler.ProtoValidation
+import com.trueaccord.scalapb.compiler.StreamType
+import com.trueaccord.scalapb.compiler.StreamType.{Bidirectional, ClientStreaming, ServerStreaming, Unary}
+import com.trueaccord.scalapb.compiler.Version.{scalapbVersion => ScalaPbVersion}
+import com.trueaccord.scalapb.Scalapb
 
 object RpcLibCodeGenerator extends ProtocCodeGenerator {
 
@@ -59,8 +59,8 @@ object RpcLibCodeGenerator extends ProtocCodeGenerator {
    */
   override val suggestedDependencies: Seq[Artifact] = {
     Seq(
-      Artifact("com.thesamet.scalapb", "scalapb-runtime-grpc", ScalaPbVersion, crossVersion = true),
-      Artifact("com.tubitv.rpclib"   , "rpclib-runtime"      , RpclibVersion , crossVersion = true)
+      Artifact("com.trueaccord.scalapb", "scalapb-runtime-grpc", ScalaPbVersion, crossVersion = true),
+      Artifact("com.tubitv.rpclib"     , "rpclib-runtime"      , RpclibVersion , crossVersion = true)
     )
   }
 
@@ -74,8 +74,7 @@ object RpcLibCodeGenerator extends ProtocCodeGenerator {
         case (Right(params), "java_conversions")            => Right(params.copy(javaConversions         = true))
         case (Right(params), "flat_package")                => Right(params.copy(flatPackage             = true))
         case (Right(params), "grpc")                        => Right(params.copy(grpc                    = true))
-        case (Right(params), "single_line_to_proto_string") => Right(params.copy(singleLineToProtoString = true))
-        case (Right(params), "ascii_format_to_string")      => Right(params.copy(asciiFormatToString     = true))
+        case (Right(params), "single_line_to_proto_string") => Right(params.copy(singleLineToString      = true))
         case (Right(_), p)                                  => Left(s"Unrecognized parameter: '$p'")
         case (x, _)                                         => x
       }

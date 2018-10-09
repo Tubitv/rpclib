@@ -6,7 +6,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.{Flow, Source}
 import io.grpc.{ClientCall, Metadata, Status}
 import io.grpc.stub.{ClientCallStreamObserver, ClientCalls, ClientResponseObserver}
-import scalapb.grpc.Grpc
+import com.trueaccord.scalapb.grpc.Grpc
 
 object GrpcAkkaStreamsClientCalls {
 

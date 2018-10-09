@@ -1,3 +1,4 @@
+import com.trueaccord.scalapb.compiler.Version.scalapbVersion
 import com.tubitv.rpclib.compiler.RpcLibCodeGenerator
 
 lazy val rpclibTest = (project in file("."))
@@ -17,10 +18,10 @@ lazy val rpclibTest = (project in file("."))
     ),
 
     libraryDependencies ++= Seq(
-      "io.grpc"               % "grpc-netty"           % "1.13.1",
-      "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % "0.7.4",
-      "com.typesafe.akka"    %% "akka-testkit"         % "2.5.13" % Test,
-      "org.scalamock"        %% "scalamock"            % "4.1.0"  % Test,
-      "org.scalatest"        %% "scalatest"            % "3.0.5"  % Test
+      "io.grpc"                 % "grpc-netty"            % "1.13.1",
+      "com.trueaccord.scalapb" %% "scalapb-runtime-grpc" % scalapbVersion,
+      "com.typesafe.akka"       %% "akka-testkit"         % "2.5.13" % Test,
+      "org.scalamock"           %% "scalamock"            % "4.1.0"  % Test,
+      "org.scalatest"           %% "scalatest"            % "3.0.5"  % Test
     )
   )

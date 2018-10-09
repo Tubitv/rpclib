@@ -1,6 +1,5 @@
 import sbt._
 import sbt.Keys._
-import bintray.BintrayKeys._
 
 object Projects {
 
