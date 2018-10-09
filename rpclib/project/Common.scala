@@ -4,7 +4,7 @@ import bintray.BintrayKeys._
 
 object Common {
 
-  private final val RpclibVersion = "1.0.0"
+  private final val RpclibVersion = "1.1.0"
 
   lazy val settings =
     Seq(
