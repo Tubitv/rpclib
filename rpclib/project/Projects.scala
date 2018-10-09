@@ -1,5 +1,6 @@
 import sbt._
 import sbt.Keys._
+import bintray.BintrayKeys._
 
 object Projects {
 
@@ -21,7 +22,8 @@ object Projects {
         // the root project.
         publish      := {},
         publishLocal := {},
-        publishM2    := {}
+        publishM2    := {},
+        skip in publish := true
       )
       .aggregate(compiler, runtime)
 
