@@ -4,7 +4,6 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
-import com.tubitv.rpclib.runtime.GrpcAkkaStreams.GrpcOperator
 import io.grpc.stub.{ClientCallStreamObserver, ClientResponseObserver}
 
 class GrpcGraphStage[Req, Resp](operator: GrpcOperator[Req, Resp]) extends GraphStage[FlowShape[Req, Resp]] {
@@ -36,15 +35,17 @@ class GrpcGraphStage[Req, Resp](operator: GrpcOperator[Req, Resp]) extends Graph
         override def onNext(value: Resp) =
           getAsyncCallback((value: Resp) => push(out, value)).invoke(value)
 
-        override def run(): Unit = requestStream.get().foreach { reqStream =>
-          if (requested.compareAndSet(true, false)) reqStream.request(1)
-          if (reqStream.isReady) {
-            element.getAndSet(None).foreach { value =>
-              reqStream.onNext(value)
-              tryPull(in)
+        override def run(): Unit = getAsyncCallback((_: Unit) => {
+          requestStream.get().foreach { reqStream =>
+            if (requested.compareAndSet(true, false)) reqStream.request(1)
+            if (reqStream.isReady) {
+              element.getAndSet(None).foreach { value =>
+                reqStream.onNext(value)
+                tryPull(in)
+              }
             }
           }
-        }
+        }).invoke(())
       }
 
       val inObs = operator(outObs)
@@ -59,7 +60,14 @@ class GrpcGraphStage[Req, Resp](operator: GrpcOperator[Req, Resp]) extends Graph
         }
       }
 
-      override def onUpstreamFinish(): Unit = inObs.onCompleted()
+      override def onUpstreamFinish(): Unit = {
+        requestStream.get().foreach { reqStream =>
+          element.getAndSet(None).foreach { value =>
+            reqStream.onNext(value)
+          }
+        }
+        inObs.onCompleted()
+      }
 
       override def onUpstreamFailure(t: Throwable): Unit = inObs.onError(t)
 

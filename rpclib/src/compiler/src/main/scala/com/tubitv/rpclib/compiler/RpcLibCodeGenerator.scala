@@ -189,7 +189,6 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
         "com.tubitv.rpclib.runtime.FailurePolicy.DeadlinePolicy",
         "com.tubitv.rpclib.runtime.FailurePolicy.Fallthrough",
         "com.tubitv.rpclib.runtime.FailurePolicy.RetryPolicy",
-        "com.tubitv.rpclib.runtime.GrpcAkkaStreams._",
         "com.tubitv.rpclib.runtime.{GrpcAkkaStreamsClientCalls, GrpcAkkaStreamsServerCalls}",
         "com.tubitv.rpclib.runtime.headers.EnvoyHeaders",
         "com.tubitv.rpclib.runtime.interceptors.EnvoyHeadersClientInterceptor",
@@ -340,19 +339,19 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
             method.streamType match {
               case Unary => printer
                 .add(s"GrpcAkkaStreamsClientCalls.unaryFlow[${method.scalaIn}, ${method.scalaOut}](")
-                .addIndented(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
+                .addIndented(s"() => channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
                 .add(")")
               case ServerStreaming => printer
                 .add(s"GrpcAkkaStreamsClientCalls.serverStreamingFlow[${method.scalaIn}, ${method.scalaOut}](")
-                .addIndented(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
+                .addIndented(s"() => channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
                 .add(")")
               case ClientStreaming => printer
                 .add(s"GrpcAkkaStreamsClientCalls.clientStreamingFlow[${method.scalaIn}, ${method.scalaOut}](")
-                .addIndented(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
+                .addIndented(s"() => channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
                 .add(")")
               case Bidirectional => printer
                 .add(s"GrpcAkkaStreamsClientCalls.bidiStreamingFlow[${method.scalaIn}, ${method.scalaOut}](")
-                .addIndented(s"channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
+                .addIndented(s"() => channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
                 .add(")")
             }
           }
@@ -450,19 +449,19 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
             case StreamType.Unary =>
               printer
                 .add(s"Method${method.getName},")
-                .add(s"GrpcAkkaStreamsServerCalls.unaryCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+                .add(s"GrpcAkkaStreamsServerCalls.unaryCall(serviceImpl.${method.name}(_))")
             case StreamType.ClientStreaming =>
               printer
                 .add(s"Method${method.getName},")
-                .add(s"GrpcAkkaStreamsServerCalls.clientStreamingCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+                .add(s"GrpcAkkaStreamsServerCalls.clientStreamingCall(serviceImpl.${method.name}(_))")
             case StreamType.ServerStreaming =>
               printer
                 .add(s"Method${method.getName},")
-                .add(s"GrpcAkkaStreamsServerCalls.serverStreamingCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+                .add(s"GrpcAkkaStreamsServerCalls.serverStreamingCall(serviceImpl.${method.name}(_))")
             case StreamType.Bidirectional =>
               printer
               .add(s"Method${method.getName},")
-              .add(s"GrpcAkkaStreamsServerCalls.bidiStreamingCall(serviceImpl.${method.name}(EnvoyHeadersServerInterceptor.ContextKey.get(Context.current)))")
+              .add(s"GrpcAkkaStreamsServerCalls.bidiStreamingCall(serviceImpl.${method.name}(_))")
           }
         }
 

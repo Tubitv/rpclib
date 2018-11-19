@@ -14,6 +14,7 @@ class GrpcSinkStage[Resp](observer: CallStreamObserver[Resp]) extends GraphStage
       override def run(): Unit = getAsyncCallback((_: Unit) => {
         element match {
           case Some(value) if observer.isReady =>
+            element = None
             observer.onNext(value)
             tryPull(in)
           case _ => ()
@@ -28,7 +29,13 @@ class GrpcSinkStage[Resp](observer: CallStreamObserver[Resp]) extends GraphStage
         } else element = Some(value)
       }
 
-      override def onUpstreamFinish(): Unit = observer.onCompleted()
+      override def onUpstreamFinish(): Unit = {
+        element match {
+          case Some(value) => observer.onNext(value)
+          case _ =>
+        }
+        observer.onCompleted()
+      }
 
       override def onUpstreamFailure(t: Throwable): Unit = observer.onError(t)
 
