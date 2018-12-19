@@ -7,7 +7,7 @@ import protocbridge.JvmGenerator
 package object compiler {
 
   /** TODO(dan): Scaladoc */
-  final val RpclibVersion = "1.0.0"
+  final val RpclibRuntimeVersion = "2.0.0-SNAPSHOT"
 
   /** Entry point for Scala RPC wrapper compiler plugin.
    *
