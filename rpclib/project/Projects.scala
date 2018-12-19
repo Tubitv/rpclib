@@ -1,5 +1,6 @@
 import sbt._
 import sbt.Keys._
+import sbt.ScriptedPlugin.autoImport._
 
 object Projects {
 
@@ -8,7 +9,7 @@ object Projects {
   private val `scala-2.11` = "2.11.12"
   private val `scala-2.12` = "2.12.6"
   private val `sbt-0.13`   = "0.13.17"
-  private val `sbt-1.x`    = "1.1.6"
+  private val `sbt-1.x`    = "1.2.7"
 
   lazy val root =
     (project in file("."))
@@ -27,9 +28,8 @@ object Projects {
 
   lazy val compiler =
     Project(id = "rpclib-compiler", base = file("src/compiler"))
+      .enablePlugins(ScriptedPlugin)
       .settings(
-        sbtPlugin := true,
-
         Common.settings,
 
         // This fine specimen of an ugly hack is brought to you by SBT
@@ -43,6 +43,11 @@ object Projects {
             case "2.12" => `sbt-1.x`
           }
         },
+
+        scriptedLaunchOpts := { scriptedLaunchOpts.value ++
+          Seq("-Xmx1024M", "-Dplugin.version=" + version.value)
+        },
+        scriptedBufferLog := false,
 
         libraryDependencies += Libraries.scalapbCompiler
       )

@@ -11,43 +11,51 @@ import com.google.protobuf.compiler.PluginProtos.CodeGeneratorRequest
 import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse
 import protocbridge.Artifact
 import protocbridge.ProtocCodeGenerator
-import scalapb.compiler.DescriptorPimps
-import scalapb.compiler.FunctionalPrinter
-import scalapb.compiler.GeneratorException
-import scalapb.compiler.GeneratorParams
-import scalapb.compiler.NameUtils
-import scalapb.compiler.ProtoValidation
-import scalapb.compiler.StreamType
+import scalapb.compiler.{GeneratorException, _}
 import scalapb.compiler.StreamType.{Bidirectional, ClientStreaming, ServerStreaming, Unary}
 import scalapb.compiler.Version.{scalapbVersion => ScalaPbVersion}
 import scalapb.options.compiler.Scalapb
 
 object RpcLibCodeGenerator extends ProtocCodeGenerator {
-
   /** TODO(dan): Scaladoc */
-  override def run(req: Array[Byte]): Array[Byte] = {
+  override def run(input: Array[Byte]): Array[Byte] = {
     val registry = ExtensionRegistry.newInstance()
     Scalapb.registerAllExtensions(registry)
-    val request = CodeGeneratorRequest.parseFrom(req, registry)
+    val request = CodeGeneratorRequest.parseFrom(input, registry)
+    val builder = CodeGeneratorResponse.newBuilder()
+    val params = GeneratorParams() // we don't use these for anything here
 
-    val response = parseParameters(request.getParameter) match {
-      case Right(params) =>
-        try
-          generateFiles(request, params)
-        catch {
-          case e: GeneratorException =>
-            CodeGeneratorResponse.newBuilder()
-              .setError(e.message)
-              .build
-        }
+    val filesByName: Map[String, FileDescriptor] = request
+      .getProtoFileList
+      .asScala
+      .foldLeft(Map.empty[String, FileDescriptor])((acc, fdProto) => {
+        val deps = fdProto.getDependencyList.asScala.map(acc)
+        acc + (fdProto.getName -> FileDescriptor.buildFrom(fdProto, deps.toArray))
+      })
+    val implicits = new DescriptorImplicits(params, filesByName.values.toVector)
 
-      case Left(error) =>
-        CodeGeneratorResponse.newBuilder()
-          .setError(error)
-          .build
-    }
+    request
+      .getFileToGenerateList
+      .asScala
+      .foreach(name => {
+        val fd = filesByName(name)
+        val response = generateServices(fd, implicits)
+        builder.addAllFile(response.asJava)
+      })
+    builder.build.toByteArray
+  }
 
-    response.toByteArray
+  def generateServices(file: FileDescriptor, implicits: DescriptorImplicits): Seq[CodeGeneratorResponse.File] = {
+    import implicits._
+
+    file.getServices.asScala.map { service =>
+        val p    = new RpcLibCodeGenerator(service, implicits)
+        val code = p.run()
+        val b    = CodeGeneratorResponse.File.newBuilder()
+        b.setName(file.scalaDirectory + "/" + service.objectName + "AkkaStream.scala")
+        b.setContent(code)
+        b.build()
+      }.toList
   }
 
   /** Transitive library dependencies.
@@ -60,82 +68,13 @@ object RpcLibCodeGenerator extends ProtocCodeGenerator {
   override val suggestedDependencies: Seq[Artifact] = {
     Seq(
       Artifact("com.thesamet.scalapb", "scalapb-runtime-grpc", ScalaPbVersion, crossVersion = true),
-      Artifact("com.tubitv.rpclib"   , "rpclib-runtime"      , RpclibVersion , crossVersion = true)
+      Artifact("com.tubitv.rpclib"   , "rpclib-runtime"      , RpclibRuntimeVersion , crossVersion = true)
     )
-  }
-
-  /** TODO(dan): Scaladoc */
-  private def parseParameters(params: String): Either[String, GeneratorParams] = {
-    params
-      .split(",")
-      .map(_.trim)
-      .filter(_.nonEmpty)
-      .foldLeft[Either[String, GeneratorParams]](Right(GeneratorParams())) {
-        case (Right(params), "java_conversions")            => Right(params.copy(javaConversions         = true))
-        case (Right(params), "flat_package")                => Right(params.copy(flatPackage             = true))
-        case (Right(params), "grpc")                        => Right(params.copy(grpc                    = true))
-        case (Right(params), "single_line_to_proto_string") => Right(params.copy(singleLineToProtoString = true))
-        case (Right(params), "ascii_format_to_string")      => Right(params.copy(asciiFormatToString     = true))
-        case (Right(_), p)                                  => Left(s"Unrecognized parameter: '$p'")
-        case (x, _)                                         => x
-      }
-  }
-
-  /** TODO(dan): Scaladoc */
-  private def generateFiles(request: CodeGeneratorRequest, params: GeneratorParams): CodeGeneratorResponse = {
-    val fileDescriptors: Map[String, FileDescriptor] =
-      request.getProtoFileList.asScala.foldLeft(Map.empty[String, FileDescriptor]) {
-        case (acc, fp) =>
-          val deps = fp.getDependencyList.asScala.map(acc)
-          acc + ((fp.getName, FileDescriptor.buildFrom(fp, deps.toArray)))
-
-          // TODO(dan): File bug against SBT.
-          //
-          // Implicit class `ArrowAssoc` isn't being used when code is run as
-          // a compiler plugin.  In other words, this will fail at runtime:
-          //
-          //     "one" -> 1
-          //
-          // Instead, it must be written as a tuple:
-          //
-          //     ("one", 1)
-      }
-
-    val validator = new ProtoValidation(params)
-    fileDescriptors.values.foreach(validator.validateFile)
-
-    val b = CodeGeneratorResponse.newBuilder()
-    request.getFileToGenerateList.asScala.foreach {
-      name =>
-        val file = fileDescriptors(name)
-        val responseFiles = generateFile(params, file)
-        b.addAllFile(responseFiles.asJava)
-    }
-    b.build
-  }
-
-  private def generateFile(params: GeneratorParams, file: FileDescriptor): Seq[CodeGeneratorResponse.File] = {
-    // We create an anonymous `DescriptorPimps` object
-    // here in order to use its implicit classes.
-    val descriptorPimps = {
-      val unshadowed = params
-      new DescriptorPimps { override val params = unshadowed }
-    }
-    import descriptorPimps.{ FileDescriptorPimp, ServiceDescriptorPimp }
-
-    file.getServices.asScala.map {
-      service =>
-        val code = new RpcLibCodeGenerator(service, params).run()
-        CodeGeneratorResponse.File.newBuilder()
-          .setName(s"${file.scalaDirectory}/${service.name}.scala")
-          .setContent(code)
-          .build
-    }.toIndexedSeq
   }
 }
 
-private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val params: GeneratorParams)
-  extends DescriptorPimps {
+final private class RpcLibCodeGenerator(service: ServiceDescriptor, implicits: DescriptorImplicits) {
+  import implicits._
 
   // Anatomy of this class:
   //
@@ -156,7 +95,7 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
       .call(addImportStatements)
       .newline
       .call(ParentObjectCodeGenerator.apply)
-      .resultTrimmed
+      .result
   }
 
   private def addPackageClause(printer: FunctionalPrinter): FunctionalPrinter = {
@@ -180,11 +119,11 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
         "akka.stream.scaladsl.Sink",
         "akka.stream.scaladsl.Source",
         "com.google.protobuf.Descriptors",
-        "com.trueaccord.scalapb.grpc.AbstractService",
-        "com.trueaccord.scalapb.grpc.ConcreteProtoFileDescriptorSupplier",
-        "com.trueaccord.scalapb.grpc.Grpc",
-        "com.trueaccord.scalapb.grpc.Marshaller",
-        "com.trueaccord.scalapb.grpc.ServiceCompanion",
+        "scalapb.grpc.AbstractService",
+        "scalapb.grpc.ConcreteProtoFileDescriptorSupplier",
+        "scalapb.grpc.Grpc",
+        "scalapb.grpc.Marshaller",
+        "scalapb.grpc.ServiceCompanion",
         "com.tubitv.rpclib.runtime.FailurePolicy.CircuitBreakerPolicy",
         "com.tubitv.rpclib.runtime.FailurePolicy.DeadlinePolicy",
         "com.tubitv.rpclib.runtime.FailurePolicy.Fallthrough",
@@ -256,7 +195,7 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
               printer
                 .newline
                 .add(s"def ${method.name}(implicit headers: EnvoyHeaders):")
-                .addIndented(s"Flow[${method.scalaIn}, ${method.scalaOut}, NotUsed]")
+                .addIndented(s"Flow[${method.inputType.baseScalaType}, ${method.outputType.baseScalaType}, NotUsed]")
             }
             .outdent
             .add("}")
@@ -338,19 +277,19 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
           def addBody(printer: FunctionalPrinter): FunctionalPrinter = {
             method.streamType match {
               case Unary => printer
-                .add(s"GrpcAkkaStreamsClientCalls.unaryFlow[${method.scalaIn}, ${method.scalaOut}](")
+                .add(s"GrpcAkkaStreamsClientCalls.unaryFlow[${method.inputType.baseScalaType}, ${method.outputType.baseScalaType}](")
                 .addIndented(s"() => channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
                 .add(")")
               case ServerStreaming => printer
-                .add(s"GrpcAkkaStreamsClientCalls.serverStreamingFlow[${method.scalaIn}, ${method.scalaOut}](")
+                .add(s"GrpcAkkaStreamsClientCalls.serverStreamingFlow[${method.inputType.baseScalaType}, ${method.outputType.baseScalaType}](")
                 .addIndented(s"() => channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
                 .add(")")
               case ClientStreaming => printer
-                .add(s"GrpcAkkaStreamsClientCalls.clientStreamingFlow[${method.scalaIn}, ${method.scalaOut}](")
+                .add(s"GrpcAkkaStreamsClientCalls.clientStreamingFlow[${method.inputType.baseScalaType}, ${method.outputType.baseScalaType}](")
                 .addIndented(s"() => channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
                 .add(")")
               case Bidirectional => printer
-                .add(s"GrpcAkkaStreamsClientCalls.bidiStreamingFlow[${method.scalaIn}, ${method.scalaOut}](")
+                .add(s"GrpcAkkaStreamsClientCalls.bidiStreamingFlow[${method.inputType.baseScalaType}, ${method.outputType.baseScalaType}](")
                 .addIndented(s"() => channelWithHeaders.newCall(Method${method.getName}, options.withOption(EnvoyHeadersClientInterceptor.HeadersKey, envoyHeaders))")
                 .add(")")
             }
@@ -360,7 +299,7 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
             .newline
             .add(s"override def ${method.name}(")
             .addIndented("implicit envoyHeaders: EnvoyHeaders")
-            .add(s"): Flow[${method.scalaIn}, ${method.scalaOut}, NotUsed] = {")
+            .add(s"): Flow[${method.inputType.baseScalaType}, ${method.outputType.baseScalaType}, NotUsed] = {")
             .indent
             .call(addBody)
             .outdent
@@ -406,14 +345,14 @@ private class RpcLibCodeGenerator(val service: ServiceDescriptor, override val p
         }
 
         printer
-          .add(s"private final val Method${method.getName}: MethodDescriptor[${method.scalaIn}, ${method.scalaOut}] = {")
+          .add(s"private final val Method${method.getName}: MethodDescriptor[${method.inputType.baseScalaType}, ${method.outputType.baseScalaType}] = {")
           .indent
           .add("MethodDescriptor.newBuilder()")
           .addIndented(
             s".setType(MethodDescriptor.MethodType.${methodType})",
             s""".setFullMethodName(MethodDescriptor.generateFullMethodName("${method.getService.getFullName}", "${method.getName}"))""",
-            s".setRequestMarshaller(new Marshaller(${method.scalaIn}))",
-            s".setResponseMarshaller(new Marshaller(${method.scalaOut}))",
+            s".setRequestMarshaller(new Marshaller(${method.inputType.baseScalaType}))",
+            s".setResponseMarshaller(new Marshaller(${method.outputType.baseScalaType}))",
             ".build()"
           )
           .outdent

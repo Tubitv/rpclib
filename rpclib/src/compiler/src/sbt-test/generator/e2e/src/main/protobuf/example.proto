@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package io.tubi.rpclib;
+
+service ExampleService1 {
+  rpc Unary           (       Request) returns (       Response);
+  rpc ServerStreaming (       Request) returns (stream Response);
+  rpc ClientStreaming (stream Request) returns (       Response);
+  rpc BidiStreaming   (stream Request) returns (stream Response);
+}
+
+service ExampleService2 {
+  rpc Unary           (       Request) returns (       Response);
+  rpc ServerStreaming (       Request) returns (stream Response);
+  rpc ClientStreaming (stream Request) returns (       Response);
+  rpc BidiStreaming   (stream Request) returns (stream Response);
+}
+
+message Request {
+  int32 value = 1;
+}
+
+message Response {
+  int32 value = 1;
+}
