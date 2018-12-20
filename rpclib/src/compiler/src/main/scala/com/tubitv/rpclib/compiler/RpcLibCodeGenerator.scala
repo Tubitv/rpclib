@@ -1,20 +1,16 @@
 package com.tubitv.rpclib.compiler
 
-import scala.collection.JavaConverters._
-import scala.collection.immutable.Seq
-import com.google.protobuf.Descriptors.Descriptor
-import com.google.protobuf.Descriptors.FileDescriptor
-import com.google.protobuf.Descriptors.MethodDescriptor
-import com.google.protobuf.Descriptors.ServiceDescriptor
+import com.google.protobuf.Descriptors.{FileDescriptor, MethodDescriptor, ServiceDescriptor}
 import com.google.protobuf.ExtensionRegistry
-import com.google.protobuf.compiler.PluginProtos.CodeGeneratorRequest
-import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse
-import protocbridge.Artifact
-import protocbridge.ProtocCodeGenerator
-import scalapb.compiler.{GeneratorException, _}
+import com.google.protobuf.compiler.PluginProtos.{CodeGeneratorRequest, CodeGeneratorResponse}
+import protocbridge.{Artifact, ProtocCodeGenerator}
 import scalapb.compiler.StreamType.{Bidirectional, ClientStreaming, ServerStreaming, Unary}
 import scalapb.compiler.Version.{scalapbVersion => ScalaPbVersion}
+import scalapb.compiler._
 import scalapb.options.compiler.Scalapb
+
+import scala.collection.JavaConverters._
+import scala.collection.immutable.Seq
 
 object RpcLibCodeGenerator extends ProtocCodeGenerator {
   /** TODO(dan): Scaladoc */
