@@ -36,7 +36,8 @@ object RpcLibCodeGenerator extends ProtocCodeGenerator {
       .foreach(name => {
         val fd = filesByName(name)
         val response = generateServices(fd, implicits)
-        builder.addAllFile(response.asJava)
+        if (response.nonEmpty)
+          builder.addAllFile(response.asJava)
       })
     builder.build.toByteArray
   }
@@ -45,13 +46,13 @@ object RpcLibCodeGenerator extends ProtocCodeGenerator {
     import implicits._
 
     file.getServices.asScala.map { service =>
-        val p    = new RpcLibCodeGenerator(service, implicits)
-        val code = p.run()
-        val b    = CodeGeneratorResponse.File.newBuilder()
-        b.setName(file.scalaDirectory + "/" + service.objectName + "AkkaStream.scala")
-        b.setContent(code)
-        b.build()
-      }.toList
+      val p    = new RpcLibCodeGenerator(service, implicits)
+      val code = p.run()
+      val b    = CodeGeneratorResponse.File.newBuilder()
+      b.setName(file.scalaDirectory + "/" + service.objectName + "AkkaStream.scala")
+      b.setContent(code)
+      b.build()
+    }.toList
   }
 
   /** Transitive library dependencies.
