@@ -1,20 +1,16 @@
 package com.tubitv.rpclib.compiler
 
-import scala.collection.JavaConverters._
-import scala.collection.immutable.Seq
-import com.google.protobuf.Descriptors.Descriptor
-import com.google.protobuf.Descriptors.FileDescriptor
-import com.google.protobuf.Descriptors.MethodDescriptor
-import com.google.protobuf.Descriptors.ServiceDescriptor
+import com.google.protobuf.Descriptors.{FileDescriptor, MethodDescriptor, ServiceDescriptor}
 import com.google.protobuf.ExtensionRegistry
-import com.google.protobuf.compiler.PluginProtos.CodeGeneratorRequest
-import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse
-import protocbridge.Artifact
-import protocbridge.ProtocCodeGenerator
-import scalapb.compiler.{GeneratorException, _}
+import com.google.protobuf.compiler.PluginProtos.{CodeGeneratorRequest, CodeGeneratorResponse}
+import protocbridge.{Artifact, ProtocCodeGenerator}
 import scalapb.compiler.StreamType.{Bidirectional, ClientStreaming, ServerStreaming, Unary}
 import scalapb.compiler.Version.{scalapbVersion => ScalaPbVersion}
+import scalapb.compiler._
 import scalapb.options.compiler.Scalapb
+
+import scala.collection.JavaConverters._
+import scala.collection.immutable.Seq
 
 object RpcLibCodeGenerator extends ProtocCodeGenerator {
   /** TODO(dan): Scaladoc */
@@ -40,7 +36,8 @@ object RpcLibCodeGenerator extends ProtocCodeGenerator {
       .foreach(name => {
         val fd = filesByName(name)
         val response = generateServices(fd, implicits)
-        builder.addAllFile(response.asJava)
+        if (response.nonEmpty)
+          builder.addAllFile(response.asJava)
       })
     builder.build.toByteArray
   }
@@ -49,13 +46,13 @@ object RpcLibCodeGenerator extends ProtocCodeGenerator {
     import implicits._
 
     file.getServices.asScala.map { service =>
-        val p    = new RpcLibCodeGenerator(service, implicits)
-        val code = p.run()
-        val b    = CodeGeneratorResponse.File.newBuilder()
-        b.setName(file.scalaDirectory + "/" + service.objectName + "AkkaStream.scala")
-        b.setContent(code)
-        b.build()
-      }.toList
+      val p    = new RpcLibCodeGenerator(service, implicits)
+      val code = p.run()
+      val b    = CodeGeneratorResponse.File.newBuilder()
+      b.setName(file.scalaDirectory + "/" + service.objectName + "AkkaStream.scala")
+      b.setContent(code)
+      b.build()
+    }.toList
   }
 
   /** Transitive library dependencies.

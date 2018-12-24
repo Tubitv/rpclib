@@ -1,4 +1,5 @@
 import sbt.Keys._
+import sbt.librarymanagement.Resolver
 
 object Common {
 
@@ -9,6 +10,7 @@ object Common {
       version       := RpclibVersion,
       organization  := "com.tubitv.rpclib",
       scalaVersion  := "2.12.6",
-      javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
+      javacOptions ++= Seq("-source", "1.8", "-target", "1.8"),
+      resolvers += Resolver.typesafeIvyRepo("releases")
     )
 }
